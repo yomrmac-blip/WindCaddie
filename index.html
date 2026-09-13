@@ -231,8 +231,12 @@
         <input type="number" id="holeInput" min="1" max="18" value="1">
       </div>
     </div>
-    <div class="pin-status" id="pinStatus">No pin saved for this hole yet.</div>
     <div class="btn-row" style="margin-top:10px;">
+      <button class="btn btn-ghost btn-block" id="loadCourseBtn" type="button">Load all 18 holes from map</button>
+    </div>
+    <div class="pin-status" id="loadCourseStatus" style="margin-top:6px;">Pulls hole locations from OpenStreetMap for the course nearest you. Free, works well for well-mapped clubs.</div>
+    <div class="pin-status" id="pinStatus" style="margin-top:12px;">No pin saved for this hole yet.</div>
+    <div class="btn-row" style="margin-top:8px;">
       <button class="btn btn-primary btn-block" id="setPinBtn" type="button">Set pin at my position</button>
     </div>
   </div>
@@ -408,6 +412,76 @@
             Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
     var brng = toDeg(Math.atan2(y, x));
     return (brng + 360) % 360;
+  }
+
+  function centroid(points){
+    var lat = 0, lon = 0;
+    points.forEach(function(p){ lat += p.lat; lon += p.lon; });
+    return {lat: lat / points.length, lon: lon / points.length};
+  }
+
+  function loadCourseFromOSM(){
+    if(!position){
+      alert("Waiting for a GPS fix — tap “Enable location” first and wait a moment, then try again.");
+      return;
+    }
+    var btn = document.getElementById("loadCourseBtn");
+    var statusEl = document.getElementById("loadCourseStatus");
+    btn.disabled = true;
+    btn.textContent = "Loading…";
+    statusEl.textContent = "Searching OpenStreetMap for the course near you…";
+
+    var query = "[out:json][timeout:25];(" +
+      "nwr[\"leisure\"=\"golf_course\"](around:3000," + position.lat + "," + position.lon + ");" +
+      "way[\"golf\"=\"hole\"](around:3000," + position.lat + "," + position.lon + ");" +
+      "way[\"golf\"=\"green\"](around:3000," + position.lat + "," + position.lon + ");" +
+      ");out geom;";
+    var url = "https://overpass-api.de/api/interpreter?data=" + encodeURIComponent(query);
+
+    fetch(url).then(function(res){
+      if(!res.ok) throw new Error("Overpass returned " + res.status);
+      return res.json();
+    }).then(function(data){
+      var els = data.elements || [];
+      var courseEl = els.find(function(e){ return e.tags && e.tags.leisure === "golf_course" && e.tags.name; });
+      var courseName = (courseEl && courseEl.tags.name) || document.getElementById("courseInput").value.trim() || "My Course";
+
+      var holeWays = els.filter(function(e){ return e.type === "way" && e.tags && e.tags.golf === "hole" && e.tags.ref && e.geometry && e.geometry.length; });
+      var greenWays = els.filter(function(e){ return e.type === "way" && e.tags && e.tags.golf === "green" && e.geometry && e.geometry.length; });
+      var greenCentroids = greenWays.map(function(g){ return centroid(g.geometry); });
+
+      if(holeWays.length === 0){
+        statusEl.textContent = "No mapped holes found within 3km on OpenStreetMap for this course — set pins manually instead.";
+        return;
+      }
+
+      if(!state.courses[courseName]) state.courses[courseName] = {holes:{}};
+      var loaded = 0;
+      holeWays.forEach(function(h){
+        var refNum = parseInt(h.tags.ref, 10);
+        if(isNaN(refNum)) return;
+        var endPoint = h.geometry[h.geometry.length - 1];
+        var best = null, bestDist = Infinity;
+        greenCentroids.forEach(function(gc){
+          var d = distanceMeters(endPoint.lat, endPoint.lon, gc.lat, gc.lon);
+          if(d < bestDist){ bestDist = d; best = gc; }
+        });
+        var pin = (best && bestDist <= 60) ? best : {lat: endPoint.lat, lon: endPoint.lon};
+        state.courses[courseName].holes[refNum] = {pin: pin, source: "osm"};
+        loaded++;
+      });
+
+      document.getElementById("courseInput").value = courseName;
+      state.currentCourse = courseName;
+      saveState();
+      render();
+      statusEl.textContent = "Loaded " + loaded + " hole" + (loaded === 1 ? "" : "s") + " from OpenStreetMap for " + courseName + ". Pins are approximate — tap “Update pin” on any hole once you're standing at it for a precise fix.";
+    }).catch(function(err){
+      statusEl.textContent = "Couldn't reach OpenStreetMap (" + err.message + "). Check your connection and try again, or set pins manually.";
+    }).finally(function(){
+      btn.disabled = false;
+      btn.textContent = "Load all 18 holes from map";
+    });
   }
 
   function mToUnit(m, unit){ return unit === "yd" ? m * 1.09361 : m; }
@@ -765,6 +839,7 @@
 
   // ---- events ----
   document.getElementById("gpsBtn").addEventListener("click", enableLocation);
+  document.getElementById("loadCourseBtn").addEventListener("click", loadCourseFromOSM);
 
   document.getElementById("courseInput").addEventListener("change", function(e){
     state.currentCourse = e.target.value.trim();
