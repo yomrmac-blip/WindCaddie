@@ -108,10 +108,11 @@
   .field{display:flex; flex-direction:column; gap:4px; flex:1;}
   .field.small{flex:0 0 76px;}
   label{font-size:0.68rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;}
-  input[type="text"], input[type="number"]{
+  input[type="text"], input[type="number"], select{
     background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
     padding:9px 10px; font-size:0.92rem; color:var(--ink); width:100%;
   }
+  select{ appearance:none; -webkit-appearance:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="%235C6E5A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'); background-repeat:no-repeat; background-position:right 10px center; padding-right:28px; }
   input[type="text"]:focus-visible, input[type="number"]:focus-visible, button:focus-visible, select:focus-visible{
     outline:2px solid var(--sky); outline-offset:1px;
   }
@@ -228,7 +229,11 @@
       </div>
       <div class="field small">
         <label for="holeInput">Hole</label>
-        <input type="number" id="holeInput" min="1" max="18" value="1">
+        <select id="holeInput"></select>
+      </div>
+      <div class="field small" style="flex:0 0 auto;">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" id="nextHoleBtn" type="button" style="min-height:40px; padding:9px 14px;">Next →</button>
       </div>
     </div>
     <div class="btn-row" style="margin-top:10px;">
@@ -897,6 +902,11 @@
     state.currentHole = parseInt(e.target.value, 10) || 1;
     render();
   });
+  document.getElementById("nextHoleBtn").addEventListener("click", function(){
+    state.currentHole = (state.currentHole % 18) + 1;
+    document.getElementById("holeInput").value = state.currentHole;
+    render();
+  });
 
   document.getElementById("setPinBtn").addEventListener("click", function(){
     if(!position){
@@ -984,8 +994,15 @@
   });
 
   // init
+  var holeSelect = document.getElementById("holeInput");
+  for(var hn = 1; hn <= 18; hn++){
+    var opt = document.createElement("option");
+    opt.value = hn;
+    opt.textContent = hn;
+    holeSelect.appendChild(opt);
+  }
   document.getElementById("courseInput").value = state.currentCourse || "";
-  document.getElementById("holeInput").value = state.currentHole || 1;
+  holeSelect.value = state.currentHole || 1;
   render();
   enableLocation();
 })();
