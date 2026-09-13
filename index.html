@@ -1,0 +1,862 @@
+<title>WindCaddie</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap">
+<style>
+  :root{
+    --bg:#F5F7F1;
+    --surface:#FFFFFF;
+    --surface-2:#EBF0E5;
+    --ink:#16241A;
+    --muted:#5C6E5A;
+    --accent:#2E6B3D;
+    --accent-ink:#FFFFFF;
+    --sky:#1D6FA5;
+    --warn:#B85A22;
+    --line:#DCE3D7;
+    --shadow: 0 1px 2px rgba(22,36,26,0.07), 0 6px 16px rgba(22,36,26,0.06);
+    --radius: 16px;
+    --font-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1511;
+      --surface:#161F18;
+      --surface-2:#1C271F;
+      --ink:#E8EFE3;
+      --muted:#93A68F;
+      --accent:#63C97A;
+      --accent-ink:#0E1511;
+      --sky:#7EC1EA;
+      --warn:#E58A4F;
+      --line:#263429;
+      --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 20px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1511;
+    --surface:#161F18;
+    --surface-2:#1C271F;
+    --ink:#E8EFE3;
+    --muted:#93A68F;
+    --accent:#63C97A;
+    --accent-ink:#0E1511;
+    --sky:#7EC1EA;
+    --warn:#E58A4F;
+    --line:#263429;
+    --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 20px rgba(0,0,0,0.35);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-ui);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    padding:18px 16px 48px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  h1,h2,h3{margin:0; text-wrap:balance;}
+  button{font-family:inherit;}
+  input,select{font-family:inherit; color:inherit;}
+  ::selection{background:var(--accent); color:var(--accent-ink);}
+
+  /* Header */
+  .header{display:flex; align-items:baseline; justify-content:space-between; gap:8px;}
+  .brand{display:flex; align-items:center; gap:9px;}
+  .brand-mark{width:26px; height:26px; flex:none;}
+  .brand-mark path{fill:none; stroke:var(--accent); stroke-width:7; stroke-linecap:round;}
+  .brand h1{font-size:1.28rem; font-weight:700; letter-spacing:-0.01em;}
+  .theme-note{font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;}
+
+  /* Card base */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:16px;
+  }
+
+  /* Status row */
+  .status-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:0.78rem; font-weight:600;
+    padding:5px 10px; border-radius:999px;
+    background:var(--surface-2); color:var(--muted);
+    border:1px solid var(--line);
+  }
+  .chip .dot{width:7px; height:7px; border-radius:50%; background:var(--muted); flex:none;}
+  .chip.good{color:var(--accent);}
+  .chip.good .dot{background:var(--accent);}
+  .chip.warn{color:var(--warn);}
+  .chip.warn .dot{background:var(--warn);}
+  .link-btn{
+    background:none; border:none; color:var(--sky); font-weight:600; font-size:0.82rem;
+    padding:6px 2px; cursor:pointer;
+  }
+
+  /* Hole picker */
+  .hole-picker{display:flex; gap:8px;}
+  .field{display:flex; flex-direction:column; gap:4px; flex:1;}
+  .field.small{flex:0 0 76px;}
+  label{font-size:0.68rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;}
+  input[type="text"], input[type="number"]{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:10px;
+    padding:9px 10px; font-size:0.92rem; color:var(--ink); width:100%;
+  }
+  input[type="text"]:focus-visible, input[type="number"]:focus-visible, button:focus-visible, select:focus-visible{
+    outline:2px solid var(--sky); outline-offset:1px;
+  }
+  .pin-status{font-size:0.8rem; color:var(--muted); margin-top:2px;}
+  .pin-status strong{color:var(--ink);}
+
+  .btn{
+    border:none; border-radius:11px; padding:11px 16px; font-weight:600; font-size:0.9rem;
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    min-height:44px;
+  }
+  .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .btn-ghost{background:var(--surface-2); color:var(--ink); border:1px solid var(--line);}
+  .btn-block{width:100%;}
+  .btn-row{display:flex; gap:8px;}
+
+  /* Compass */
+  .compass-card{display:flex; flex-direction:column; align-items:center; gap:10px;}
+  .compass-wrap{width:100%; max-width:280px; position:relative;}
+  .compass-legend{display:flex; justify-content:center; gap:18px; font-size:0.76rem; color:var(--muted); font-weight:600;}
+  .compass-legend span{display:inline-flex; align-items:center; gap:6px;}
+  .swatch{width:14px; height:3px; border-radius:2px; display:inline-block;}
+  .swatch.wind{background:var(--sky);}
+  .swatch.pin{background:var(--accent);}
+  .compass-empty{font-size:0.82rem; color:var(--muted); text-align:center; max-width:220px;}
+
+  /* Stat grid */
+  .stat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .stat-tile{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:12px 10px; text-align:center;
+  }
+  .stat-label{font-size:0.66rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;}
+  .stat-value{font-family:var(--font-mono); font-weight:600; font-size:1.28rem; margin-top:4px; font-variant-numeric:tabular-nums;}
+  .stat-unit{font-size:0.68rem; color:var(--muted); font-weight:500;}
+
+  /* Club card */
+  .club-card{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+  .club-eyebrow{font-size:0.7rem; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.07em;}
+  .club-name{font-family:var(--font-mono); font-size:2rem; font-weight:700; line-height:1.05; margin-top:2px;}
+  .club-detail{font-size:0.8rem; color:var(--muted); margin-top:4px;}
+  .club-icon{width:40px; height:40px; flex:none;}
+  .club-icon path{fill:none; stroke:var(--accent); stroke-width:6; stroke-linecap:round; stroke-linejoin:round;}
+
+  /* Wind entry */
+  .wind-head{display:flex; align-items:center; justify-content:space-between;}
+  .segmented{display:flex; background:var(--surface-2); border-radius:10px; padding:2px; border:1px solid var(--line);}
+  .segmented button{
+    flex:1; border:none; background:none; padding:6px 10px; font-size:0.76rem; font-weight:600;
+    color:var(--muted); border-radius:8px; cursor:pointer; min-height:32px;
+  }
+  .segmented button.active{background:var(--surface); color:var(--ink); box-shadow:var(--shadow);}
+  .wind-inputs{display:flex; gap:10px; margin-top:12px;}
+  .dir-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:12px;}
+  .dir-btn{
+    background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:8px 4px;
+    font-size:0.78rem; font-weight:600; color:var(--ink); cursor:pointer; min-height:40px;
+  }
+  .dir-btn.active{background:var(--sky); border-color:var(--sky); color:var(--accent-ink);}
+  .wind-meta{font-size:0.74rem; color:var(--muted); margin-top:10px;}
+
+  /* Settings */
+  details.card{padding:0;}
+  details.card > summary{
+    list-style:none; cursor:pointer; padding:16px; display:flex; align-items:center; justify-content:space-between;
+    font-weight:600; font-size:0.92rem;
+  }
+  details.card > summary::-webkit-details-marker{display:none;}
+  .chevron{transition:transform 0.15s ease; color:var(--muted);}
+  details[open] .chevron{transform:rotate(90deg);}
+  .settings-body{padding:0 16px 16px; display:flex; flex-direction:column; gap:18px; border-top:1px solid var(--line); padding-top:14px;}
+  .settings-section h3{font-size:0.78rem; text-transform:uppercase; letter-spacing:0.06em; color:var(--muted); margin-bottom:8px;}
+  .club-row{display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--line);}
+  .club-row:last-child{border-bottom:none;}
+  .club-row input[type="text"]{flex:1;}
+  .club-row input[type="number"]{width:70px; text-align:right; font-family:var(--font-mono);}
+  .icon-btn{background:none; border:none; color:var(--muted); cursor:pointer; padding:6px; min-width:32px; min-height:32px;}
+  .icon-btn:hover{color:var(--warn);}
+  .hole-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid var(--line); font-size:0.84rem;}
+  .hole-row:last-child{border-bottom:none;}
+  .hole-row button.link-btn{padding:0;}
+  .empty-note{font-size:0.82rem; color:var(--muted); font-style:italic;}
+  .add-row{display:flex; gap:6px; margin-top:8px;}
+
+  footer{font-size:0.74rem; color:var(--muted); text-align:center; line-height:1.5; padding:4px 8px;}
+  footer strong{color:var(--ink);}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important;}
+  }
+</style>
+
+<div class="app">
+
+  <div class="header">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24"><path d="M6 3v18M6 3l12 4-12 5"/></svg>
+      <h1>WindCaddie</h1>
+    </div>
+    <span class="theme-note">On-course caddie</span>
+  </div>
+
+  <div class="card status-row">
+    <span class="chip" id="gpsChip"><span class="dot"></span><span id="gpsChipText">Location off</span></span>
+    <button class="link-btn" id="gpsBtn" type="button">Enable location</button>
+  </div>
+
+  <div class="card">
+    <div class="hole-picker">
+      <div class="field">
+        <label for="courseInput">Course</label>
+        <input type="text" id="courseInput" list="courseList" placeholder="e.g. The Lakes GC">
+        <datalist id="courseList"></datalist>
+      </div>
+      <div class="field small">
+        <label for="holeInput">Hole</label>
+        <input type="number" id="holeInput" min="1" max="18" value="1">
+      </div>
+    </div>
+    <div class="pin-status" id="pinStatus">No pin saved for this hole yet.</div>
+    <div class="btn-row" style="margin-top:10px;">
+      <button class="btn btn-primary btn-block" id="setPinBtn" type="button">Set pin at my position</button>
+    </div>
+  </div>
+
+  <div class="card compass-card">
+    <div class="compass-wrap">
+      <svg viewBox="0 0 300 300" id="compassSvg" role="img" aria-label="Compass showing wind and pin direction"></svg>
+    </div>
+    <div class="compass-legend">
+      <span><i class="swatch wind"></i>Wind</span>
+      <span><i class="swatch pin"></i>Pin</span>
+    </div>
+    <div class="compass-empty" id="compassEmpty">Enable location and set a pin to see live bearings.</div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-tile">
+      <div class="stat-label">Distance</div>
+      <div class="stat-value" id="statDistance">&mdash;</div>
+      <div class="stat-unit" id="statDistanceUnit">m to pin</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label">Head / Tail</div>
+      <div class="stat-value" id="statHeadwind">&mdash;</div>
+      <div class="stat-unit" id="statHeadwindUnit">km/h</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-label">Crosswind</div>
+      <div class="stat-value" id="statCrosswind">&mdash;</div>
+      <div class="stat-unit" id="statCrosswindUnit">km/h</div>
+    </div>
+  </div>
+
+  <div class="card club-card">
+    <div>
+      <div class="club-eyebrow">Suggested club</div>
+      <div class="club-name" id="clubName">&mdash;</div>
+      <div class="club-detail" id="clubDetail">Set a pin and enter wind to get a suggestion.</div>
+    </div>
+    <svg class="club-icon" viewBox="0 0 24 24"><path d="M5 21l3-13 10 4-7 2"/></svg>
+  </div>
+
+  <div class="card">
+    <div class="wind-head">
+      <h3>Wind</h3>
+      <div class="segmented" id="windUnitSeg">
+        <button data-unit="kmh" type="button">km/h</button>
+        <button data-unit="mph" type="button">mph</button>
+      </div>
+    </div>
+    <div class="wind-inputs">
+      <div class="field">
+        <label for="windSpeedInput">Speed</label>
+        <input type="number" id="windSpeedInput" min="0" max="150" placeholder="e.g. 14">
+      </div>
+      <div class="field">
+        <label for="windDegInput">Exact &deg; (from)</label>
+        <input type="number" id="windDegInput" min="0" max="359" placeholder="e.g. 315">
+      </div>
+    </div>
+    <div class="dir-grid" id="dirGrid"></div>
+    <div class="wind-meta" id="windMeta">Wind is entered manually &mdash; check a weather app, then set speed and the direction it's coming <em>from</em>.</div>
+  </div>
+
+  <details class="card" id="settingsDetails">
+    <summary>Settings <svg class="chevron" width="16" height="16" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+    <div class="settings-body">
+      <div class="settings-section">
+        <h3>Units</h3>
+        <div class="segmented" id="distUnitSeg">
+          <button data-unit="m" type="button">Meters</button>
+          <button data-unit="yd" type="button">Yards</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Club distances</h3>
+        <div id="clubList"></div>
+        <div class="add-row">
+          <input type="text" id="newClubName" placeholder="Club name">
+          <input type="number" id="newClubDist" placeholder="0" style="width:70px;">
+          <button class="btn btn-ghost" id="addClubBtn" type="button">Add</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Saved holes</h3>
+        <div id="holeList"></div>
+      </div>
+    </div>
+  </details>
+
+  <footer>
+    <strong>WindCaddie</strong> &mdash; prototype. Position and pin distance are live from your phone's GPS; wind is manual for now. A hosted version with a live weather feed is next.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE_KEY = "windcaddie_v1";
+
+  var DEFAULT_CLUBS = [
+    {name:"Driver", distance:210},
+    {name:"3-Wood", distance:190},
+    {name:"5-Wood", distance:175},
+    {name:"4-Iron", distance:165},
+    {name:"5-Iron", distance:155},
+    {name:"6-Iron", distance:145},
+    {name:"7-Iron", distance:135},
+    {name:"8-Iron", distance:125},
+    {name:"9-Iron", distance:115},
+    {name:"PW", distance:100},
+    {name:"GW", distance:90},
+    {name:"SW", distance:75},
+    {name:"LW", distance:60}
+  ];
+
+  var DIRS = [
+    {label:"N", deg:0}, {label:"NE", deg:45}, {label:"E", deg:90}, {label:"SE", deg:135},
+    {label:"S", deg:180}, {label:"SW", deg:225}, {label:"W", deg:270}, {label:"NW", deg:315}
+  ];
+
+  function defaultState(){
+    return {
+      units: "m",
+      windUnit: "kmh",
+      wind: {speed:null, dir:null, updatedAt:null},
+      clubs: DEFAULT_CLUBS.slice(),
+      courses: {},
+      currentCourse: "",
+      currentHole: 1
+    };
+  }
+
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      if(!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      var base = defaultState();
+      return Object.assign(base, parsed);
+    }catch(e){
+      return defaultState();
+    }
+  }
+
+  function saveState(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  var state = loadState();
+  var position = null; // {lat, lon, accuracy}
+  var watchId = null;
+
+  // ---- math helpers ----
+  function toRad(d){ return d * Math.PI / 180; }
+  function toDeg(r){ return r * 180 / Math.PI; }
+
+  function distanceMeters(lat1, lon1, lat2, lon2){
+    var R = 6371000;
+    var dLat = toRad(lat2 - lat1);
+    var dLon = toRad(lon2 - lon1);
+    var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)*Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  function bearingDeg(lat1, lon1, lat2, lon2){
+    var y = Math.sin(toRad(lon2-lon1)) * Math.cos(toRad(lat2));
+    var x = Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2-lon1));
+    var brng = toDeg(Math.atan2(y, x));
+    return (brng + 360) % 360;
+  }
+
+  function mToUnit(m, unit){ return unit === "yd" ? m * 1.09361 : m; }
+  function kmhToMph(v){ return v / 1.60934; }
+
+  function currentHoleData(){
+    var course = state.courses[state.currentCourse];
+    if(!course) return null;
+    return course.holes[state.currentHole] || null;
+  }
+
+  // ---- rendering ----
+  function renderCourseList(){
+    var dl = document.getElementById("courseList");
+    dl.innerHTML = "";
+    Object.keys(state.courses).forEach(function(name){
+      var opt = document.createElement("option");
+      opt.value = name;
+      dl.appendChild(opt);
+    });
+  }
+
+  function renderPinStatus(){
+    var hole = currentHoleData();
+    var el = document.getElementById("pinStatus");
+    var btn = document.getElementById("setPinBtn");
+    if(hole && hole.pin){
+      el.innerHTML = "Pin saved &middot; <strong>" + hole.pin.lat.toFixed(5) + ", " + hole.pin.lon.toFixed(5) + "</strong>";
+      btn.textContent = "Update pin to my position";
+    } else {
+      el.textContent = "No pin saved for this hole yet.";
+      btn.textContent = "Set pin at my position";
+    }
+  }
+
+  function renderWindUI(){
+    document.getElementById("windSpeedInput").value = state.wind.speed !== null ? state.wind.speed : "";
+    document.getElementById("windDegInput").value = state.wind.dir !== null ? state.wind.dir : "";
+
+    var seg = document.getElementById("windUnitSeg");
+    Array.prototype.forEach.call(seg.querySelectorAll("button"), function(b){
+      b.classList.toggle("active", b.dataset.unit === state.windUnit);
+    });
+
+    document.querySelectorAll(".dir-btn").forEach(function(b){
+      var d = parseInt(b.dataset.deg, 10);
+      var active = state.wind.dir !== null && (Math.round(state.wind.dir / 45) % 8) === (d / 45);
+      b.classList.toggle("active", active);
+    });
+
+    var meta = document.getElementById("windMeta");
+    if(state.wind.updatedAt){
+      var mins = Math.round((Date.now() - state.wind.updatedAt) / 60000);
+      var when = mins < 1 ? "just now" : (mins + " min ago");
+      meta.textContent = "Set " + when + " — update any time you check a weather app.";
+    } else {
+      meta.textContent = "Wind is entered manually — check a weather app, then set speed and the direction it's coming from.";
+    }
+
+    var distUnitSeg = document.getElementById("distUnitSeg");
+    Array.prototype.forEach.call(distUnitSeg.querySelectorAll("button"), function(b){
+      b.classList.toggle("active", b.dataset.unit === state.units);
+    });
+  }
+
+  function buildCompassSvg(windToDeg, pinDeg, hasWind, hasPin){
+    var svg = document.getElementById("compassSvg");
+    var parts = [];
+    var cx = 150, cy = 150, r = 118;
+
+    parts.push('<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="var(--surface-2)" stroke="var(--line)" stroke-width="1.5"/>');
+
+    // tick marks every 30deg
+    for(var d = 0; d < 360; d += 30){
+      var rad = toRad(d);
+      var x1 = cx + Math.sin(rad) * (r - 8), y1 = cy - Math.cos(rad) * (r - 8);
+      var x2 = cx + Math.sin(rad) * r, y2 = cy - Math.cos(rad) * r;
+      parts.push('<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="var(--line)" stroke-width="2"/>');
+    }
+
+    var labels = [["N",0],["E",90],["S",180],["W",270]];
+    labels.forEach(function(l){
+      var rad = toRad(l[1]);
+      var lx = cx + Math.sin(rad) * (r - 22);
+      var ly = cy - Math.cos(rad) * (r - 22) + 5;
+      parts.push('<text x="'+lx+'" y="'+ly+'" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="600" fill="var(--muted)">'+l[0]+'</text>');
+    });
+
+    // center dot (you)
+    parts.push('<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="var(--ink)"/>');
+
+    function arrow(deg, length, color, labelText){
+      var rad = toRad(deg);
+      var tipX = cx + Math.sin(rad) * length;
+      var tipY = cy - Math.cos(rad) * length;
+      var backX = cx - Math.sin(rad) * 10;
+      var backY = cy + Math.cos(rad) * 10;
+      var headLen = 14;
+      var headRad1 = toRad(deg - 155);
+      var headRad2 = toRad(deg + 155);
+      var h1x = tipX + Math.sin(headRad1) * headLen, h1y = tipY - Math.cos(headRad1) * headLen;
+      var h2x = tipX + Math.sin(headRad2) * headLen, h2y = tipY - Math.cos(headRad2) * headLen;
+      var s = '<g>';
+      s += '<line x1="'+backX+'" y1="'+backY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="'+color+'" stroke-width="5" stroke-linecap="round"/>';
+      s += '<polygon points="'+tipX+','+tipY+' '+h1x+','+h1y+' '+h2x+','+h2y+'" fill="'+color+'"/>';
+      var lx = cx + Math.sin(rad) * (length + 22);
+      var ly = cy - Math.cos(rad) * (length + 22) + 4;
+      s += '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" font-family="var(--font-mono)" font-size="12" font-weight="600" fill="'+color+'">'+labelText+'</text>';
+      s += '</g>';
+      return s;
+    }
+
+    if(hasWind){
+      parts.push(arrow(windToDeg, 68, "var(--sky)", Math.round(windToDeg) + "°"));
+    }
+    if(hasPin){
+      parts.push(arrow(pinDeg, 96, "var(--accent)", Math.round(pinDeg) + "°"));
+    }
+
+    svg.innerHTML = parts.join("");
+  }
+
+  function render(){
+    renderCourseList();
+    renderPinStatus();
+    renderWindUI();
+    renderClubList();
+    renderHoleList();
+
+    var hole = currentHoleData();
+    var hasPin = !!(hole && hole.pin);
+    var hasWind = state.wind.speed !== null && state.wind.dir !== null;
+    var hasPos = !!position;
+
+    var pinDeg = 0, distM = null;
+    if(hasPin && hasPos){
+      distM = distanceMeters(position.lat, position.lon, hole.pin.lat, hole.pin.lon);
+      pinDeg = bearingDeg(position.lat, position.lon, hole.pin.lat, hole.pin.lon);
+    }
+
+    var windToDeg = hasWind ? (state.wind.dir + 180) % 360 : 0;
+    buildCompassSvg(windToDeg, pinDeg, hasWind, hasPin && hasPos);
+
+    document.getElementById("compassEmpty").style.display = (hasPin && hasPos) || hasWind ? "none" : "block";
+
+    // distance tile
+    var distEl = document.getElementById("statDistance");
+    var distUnitEl = document.getElementById("statDistanceUnit");
+    distUnitEl.textContent = (state.units === "yd" ? "yd" : "m") + " to pin";
+    if(distM !== null){
+      distEl.textContent = Math.round(mToUnit(distM, state.units));
+    } else {
+      distEl.textContent = "—";
+    }
+
+    // wind components
+    var headEl = document.getElementById("statHeadwind");
+    var crossEl = document.getElementById("statCrosswind");
+    document.getElementById("statHeadwindUnit").textContent = state.windUnit === "mph" ? "mph" : "km/h";
+    document.getElementById("statCrosswindUnit").textContent = state.windUnit === "mph" ? "mph" : "km/h";
+
+    var headwind = null, crosswind = null, headwindMph = null;
+    if(hasWind && hasPin && hasPos){
+      var diff = toRad(state.wind.dir - pinDeg);
+      headwind = state.wind.speed * Math.cos(diff);
+      crosswind = state.wind.speed * Math.sin(diff);
+      var speedMph = state.windUnit === "mph" ? state.wind.speed : kmhToMph(state.wind.speed);
+      headwindMph = speedMph * Math.cos(diff);
+      headEl.textContent = (headwind >= 0 ? "+" : "") + Math.round(headwind);
+      crossEl.textContent = (crosswind >= 0 ? "R→L " : "L→R ") + Math.abs(Math.round(crosswind));
+    } else {
+      headEl.textContent = "—";
+      crossEl.textContent = "—";
+    }
+
+    // club suggestion
+    var clubNameEl = document.getElementById("clubName");
+    var clubDetailEl = document.getElementById("clubDetail");
+    if(distM !== null){
+      var distDisplay = mToUnit(distM, state.units);
+      var pct = 0;
+      if(headwindMph !== null){
+        pct = headwindMph >= 0 ? headwindMph * 0.01 : headwindMph * 0.005;
+      }
+      var effective = distDisplay * (1 + pct);
+      var best = null, bestDiff = Infinity;
+      state.clubs.forEach(function(c){
+        var diff = Math.abs(c.distance - effective);
+        if(diff < bestDiff){ bestDiff = diff; best = c; }
+      });
+      if(best){
+        clubNameEl.textContent = best.name;
+        var windNote = headwindMph !== null && Math.abs(headwindMph) > 1
+          ? (headwindMph > 0 ? ", into the wind" : ", helping wind")
+          : "";
+        clubDetailEl.textContent = Math.round(distDisplay) + (state.units==="yd"?"yd":"m") + " plays like " +
+          Math.round(effective) + (state.units==="yd"?"yd":"m") + windNote + ".";
+      } else {
+        clubNameEl.textContent = "—";
+        clubDetailEl.textContent = "Add clubs in Settings to get a suggestion.";
+      }
+    } else {
+      clubNameEl.textContent = "—";
+      clubDetailEl.textContent = hasPin ? "Waiting for a GPS fix…" : "Set a pin to get a suggestion.";
+    }
+
+    saveState();
+  }
+
+  function renderClubList(){
+    var list = document.getElementById("clubList");
+    list.innerHTML = "";
+    state.clubs
+      .slice()
+      .sort(function(a,b){ return b.distance - a.distance; })
+      .forEach(function(club){
+        var row = document.createElement("div");
+        row.className = "club-row";
+
+        var nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = club.name;
+        nameInput.addEventListener("change", function(){
+          club.name = nameInput.value || club.name;
+          render();
+        });
+
+        var distInput = document.createElement("input");
+        distInput.type = "number";
+        distInput.value = club.distance;
+        distInput.addEventListener("change", function(){
+          var v = parseFloat(distInput.value);
+          if(!isNaN(v)) club.distance = v;
+          render();
+        });
+
+        var unitSpan = document.createElement("span");
+        unitSpan.className = "stat-unit";
+        unitSpan.textContent = state.units === "yd" ? "yd" : "m";
+
+        var del = document.createElement("button");
+        del.className = "icon-btn";
+        del.type = "button";
+        del.setAttribute("aria-label", "Remove " + club.name);
+        del.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0l-1 13a1 1 0 01-1 1H8a1 1 0 01-1-1L6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        del.addEventListener("click", function(){
+          state.clubs = state.clubs.filter(function(c){ return c !== club; });
+          render();
+        });
+
+        row.appendChild(nameInput);
+        row.appendChild(distInput);
+        row.appendChild(unitSpan);
+        row.appendChild(del);
+        list.appendChild(row);
+      });
+  }
+
+  function renderHoleList(){
+    var list = document.getElementById("holeList");
+    list.innerHTML = "";
+    var entries = [];
+    Object.keys(state.courses).forEach(function(courseName){
+      Object.keys(state.courses[courseName].holes).forEach(function(holeNum){
+        entries.push({course: courseName, hole: holeNum, pin: state.courses[courseName].holes[holeNum].pin});
+      });
+    });
+    if(entries.length === 0){
+      var note = document.createElement("div");
+      note.className = "empty-note";
+      note.textContent = "No holes saved yet.";
+      list.appendChild(note);
+      return;
+    }
+    entries.forEach(function(e){
+      var row = document.createElement("div");
+      row.className = "hole-row";
+      var label = document.createElement("span");
+      label.textContent = e.course + " · Hole " + e.hole;
+      var actions = document.createElement("div");
+      actions.className = "btn-row";
+
+      var goBtn = document.createElement("button");
+      goBtn.className = "link-btn";
+      goBtn.type = "button";
+      goBtn.textContent = "Load";
+      goBtn.addEventListener("click", function(){
+        document.getElementById("courseInput").value = e.course;
+        document.getElementById("holeInput").value = e.hole;
+        state.currentCourse = e.course;
+        state.currentHole = parseInt(e.hole, 10);
+        render();
+      });
+
+      var delBtn = document.createElement("button");
+      delBtn.className = "icon-btn";
+      delBtn.type = "button";
+      delBtn.setAttribute("aria-label", "Delete " + e.course + " hole " + e.hole);
+      delBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0l-1 13a1 1 0 01-1 1H8a1 1 0 01-1-1L6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      delBtn.addEventListener("click", function(){
+        delete state.courses[e.course].holes[e.hole];
+        if(Object.keys(state.courses[e.course].holes).length === 0){
+          delete state.courses[e.course];
+        }
+        render();
+      });
+
+      actions.appendChild(goBtn);
+      actions.appendChild(delBtn);
+      row.appendChild(label);
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+  }
+
+  // ---- geolocation ----
+  function setGpsChip(mode, text){
+    var chip = document.getElementById("gpsChip");
+    chip.className = "chip" + (mode ? " " + mode : "");
+    document.getElementById("gpsChipText").textContent = text;
+  }
+
+  function onPosition(pos){
+    position = {
+      lat: pos.coords.latitude,
+      lon: pos.coords.longitude,
+      accuracy: pos.coords.accuracy
+    };
+    var acc = Math.round(pos.coords.accuracy);
+    setGpsChip(acc <= 10 ? "good" : "warn", "±" + acc + "m");
+    document.getElementById("gpsBtn").textContent = "Refresh";
+    render();
+  }
+
+  function onPositionError(err){
+    var msg = "Location unavailable";
+    if(err && err.code === 1) msg = "Permission denied";
+    else if(err && err.code === 2) msg = "Signal unavailable";
+    else if(err && err.code === 3) msg = "Timed out";
+    setGpsChip("warn", msg);
+    document.getElementById("gpsBtn").textContent = "Try again";
+  }
+
+  function enableLocation(){
+    if(!("geolocation" in navigator)){
+      setGpsChip("warn", "Not supported");
+      return;
+    }
+    setGpsChip("", "Locating…");
+    navigator.geolocation.getCurrentPosition(onPosition, onPositionError, {enableHighAccuracy:true, timeout:12000});
+    if(watchId === null){
+      watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, {enableHighAccuracy:true, maximumAge:4000, timeout:15000});
+    }
+  }
+
+  // ---- events ----
+  document.getElementById("gpsBtn").addEventListener("click", enableLocation);
+
+  document.getElementById("courseInput").addEventListener("change", function(e){
+    state.currentCourse = e.target.value.trim();
+    render();
+  });
+  document.getElementById("holeInput").addEventListener("change", function(e){
+    state.currentHole = parseInt(e.target.value, 10) || 1;
+    render();
+  });
+
+  document.getElementById("setPinBtn").addEventListener("click", function(){
+    if(!position){
+      alert("Waiting for a GPS fix — tap “Enable location” first and wait a moment.");
+      return;
+    }
+    var courseName = document.getElementById("courseInput").value.trim() || "My Course";
+    var holeNum = parseInt(document.getElementById("holeInput").value, 10) || 1;
+    state.currentCourse = courseName;
+    state.currentHole = holeNum;
+    if(!state.courses[courseName]) state.courses[courseName] = {holes:{}};
+    state.courses[courseName].holes[holeNum] = {pin:{lat:position.lat, lon:position.lon}};
+    document.getElementById("courseInput").value = courseName;
+    render();
+  });
+
+  document.getElementById("windSpeedInput").addEventListener("input", function(e){
+    var v = parseFloat(e.target.value);
+    state.wind.speed = isNaN(v) ? null : v;
+    state.wind.updatedAt = Date.now();
+    render();
+  });
+  document.getElementById("windDegInput").addEventListener("input", function(e){
+    var v = parseInt(e.target.value, 10);
+    state.wind.dir = isNaN(v) ? null : ((v % 360) + 360) % 360;
+    state.wind.updatedAt = Date.now();
+    render();
+  });
+
+  var dirGrid = document.getElementById("dirGrid");
+  DIRS.forEach(function(d){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "dir-btn";
+    b.dataset.deg = d.deg;
+    b.textContent = d.label;
+    b.addEventListener("click", function(){
+      state.wind.dir = d.deg;
+      state.wind.updatedAt = Date.now();
+      render();
+    });
+    dirGrid.appendChild(b);
+  });
+
+  document.getElementById("windUnitSeg").addEventListener("click", function(e){
+    var btn = e.target.closest("button");
+    if(!btn) return;
+    if(state.windUnit !== btn.dataset.unit){
+      if(state.wind.speed !== null){
+        state.wind.speed = btn.dataset.unit === "mph" ? +(kmhToMph(state.wind.speed)).toFixed(1) : +(state.wind.speed * 1.60934).toFixed(1);
+      }
+      state.windUnit = btn.dataset.unit;
+      render();
+    }
+  });
+
+  document.getElementById("distUnitSeg").addEventListener("click", function(e){
+    var btn = e.target.closest("button");
+    if(!btn) return;
+    if(state.units !== btn.dataset.unit){
+      var factor = btn.dataset.unit === "yd" ? 1.09361 : (1/1.09361);
+      state.clubs.forEach(function(c){ c.distance = Math.round(c.distance * factor); });
+      state.units = btn.dataset.unit;
+      render();
+    }
+  });
+
+  document.getElementById("addClubBtn").addEventListener("click", function(){
+    var nameInput = document.getElementById("newClubName");
+    var distInput = document.getElementById("newClubDist");
+    var name = nameInput.value.trim();
+    var dist = parseFloat(distInput.value);
+    if(!name || isNaN(dist)) return;
+    state.clubs.push({name:name, distance:dist});
+    nameInput.value = "";
+    distInput.value = "";
+    render();
+  });
+
+  // init
+  document.getElementById("courseInput").value = state.currentCourse || "";
+  document.getElementById("holeInput").value = state.currentHole || 1;
+  render();
+  enableLocation();
+})();
+</script>
