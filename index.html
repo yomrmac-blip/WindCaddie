@@ -282,9 +282,12 @@
   <div class="card">
     <div class="wind-head">
       <h3>Wind</h3>
-      <div class="segmented" id="windUnitSeg">
-        <button data-unit="kmh" type="button">km/h</button>
-        <button data-unit="mph" type="button">mph</button>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="link-btn" id="refreshWindBtn" type="button">Refresh live</button>
+        <div class="segmented" id="windUnitSeg">
+          <button data-unit="kmh" type="button">km/h</button>
+          <button data-unit="mph" type="button">mph</button>
+        </div>
       </div>
     </div>
     <div class="wind-inputs">
@@ -330,7 +333,7 @@
   </details>
 
   <footer>
-    <strong>WindCaddie</strong> &mdash; prototype. Position and pin distance are live from your phone's GPS; wind is manual for now. A hosted version with a live weather feed is next.
+    <strong>WindCaddie</strong> &mdash; position, pin distance, and wind (via Open-Meteo) are all live from your phone's GPS. Course data via OpenStreetMap.
   </footer>
 </div>
 
@@ -364,7 +367,7 @@
     return {
       units: "m",
       windUnit: "kmh",
-      wind: {speed:null, dir:null, updatedAt:null},
+      wind: {speed:null, dir:null, gust:null, updatedAt:null, source:null},
       clubs: DEFAULT_CLUBS.slice(),
       courses: {},
       currentCourse: "",
@@ -391,6 +394,7 @@
   var state = loadState();
   var position = null; // {lat, lon, accuracy}
   var watchId = null;
+  var windAutoFetched = false;
 
   // ---- math helpers ----
   function toRad(d){ return d * Math.PI / 180; }
@@ -484,6 +488,40 @@
     });
   }
 
+  function fetchWind(isManualRefresh){
+    if(!position) return;
+    var btn = document.getElementById("refreshWindBtn");
+    var meta = document.getElementById("windMeta");
+    if(isManualRefresh){
+      btn.disabled = true;
+      btn.textContent = "Refreshing…";
+    }
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + position.lat + "&longitude=" + position.lon +
+      "&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&wind_speed_unit=kmh";
+    fetch(url).then(function(res){
+      if(!res.ok) throw new Error("Weather service returned " + res.status);
+      return res.json();
+    }).then(function(data){
+      var cur = data.current;
+      if(!cur || typeof cur.wind_speed_10m !== "number") throw new Error("No current wind data");
+      var speedKmh = cur.wind_speed_10m;
+      state.wind.speed = state.windUnit === "mph" ? +(kmhToMph(speedKmh)).toFixed(1) : +speedKmh.toFixed(1);
+      state.wind.dir = Math.round(cur.wind_direction_10m);
+      state.wind.gust = (state.windUnit === "mph" && typeof cur.wind_gusts_10m === "number") ? +(kmhToMph(cur.wind_gusts_10m)).toFixed(0) : cur.wind_gusts_10m;
+      state.wind.updatedAt = Date.now();
+      state.wind.source = "live";
+      saveState();
+      render();
+    }).catch(function(err){
+      if(isManualRefresh) meta.textContent = "Couldn't fetch live wind (" + err.message + "). Enter it manually below.";
+    }).finally(function(){
+      if(isManualRefresh){
+        btn.disabled = false;
+        btn.textContent = "Refresh live";
+      }
+    });
+  }
+
   function mToUnit(m, unit){ return unit === "yd" ? m * 1.09361 : m; }
   function kmhToMph(v){ return v / 1.60934; }
 
@@ -536,9 +574,14 @@
     if(state.wind.updatedAt){
       var mins = Math.round((Date.now() - state.wind.updatedAt) / 60000);
       var when = mins < 1 ? "just now" : (mins + " min ago");
-      meta.textContent = "Set " + when + " — update any time you check a weather app.";
+      if(state.wind.source === "live"){
+        var gustNote = (state.wind.gust !== null && state.wind.gust !== undefined) ? (", gusting " + Math.round(state.wind.gust)) : "";
+        meta.textContent = "Live from Open-Meteo" + gustNote + " · updated " + when + ". Edit the fields to override.";
+      } else {
+        meta.textContent = "Manually entered · set " + when + " ago.";
+      }
     } else {
-      meta.textContent = "Wind is entered manually — check a weather app, then set speed and the direction it's coming from.";
+      meta.textContent = "Wind will load automatically once your location is on — or enter it yourself now.";
     }
 
     var distUnitSeg = document.getElementById("distUnitSeg");
@@ -813,6 +856,10 @@
     var acc = Math.round(pos.coords.accuracy);
     setGpsChip(acc <= 10 ? "good" : "warn", "±" + acc + "m");
     document.getElementById("gpsBtn").textContent = "Refresh";
+    if(!windAutoFetched){
+      windAutoFetched = true;
+      fetchWind(false);
+    }
     render();
   }
 
@@ -840,6 +887,7 @@
   // ---- events ----
   document.getElementById("gpsBtn").addEventListener("click", enableLocation);
   document.getElementById("loadCourseBtn").addEventListener("click", loadCourseFromOSM);
+  document.getElementById("refreshWindBtn").addEventListener("click", function(){ fetchWind(true); });
 
   document.getElementById("courseInput").addEventListener("change", function(e){
     state.currentCourse = e.target.value.trim();
@@ -869,12 +917,14 @@
     var v = parseFloat(e.target.value);
     state.wind.speed = isNaN(v) ? null : v;
     state.wind.updatedAt = Date.now();
+    state.wind.source = "manual";
     render();
   });
   document.getElementById("windDegInput").addEventListener("input", function(e){
     var v = parseInt(e.target.value, 10);
     state.wind.dir = isNaN(v) ? null : ((v % 360) + 360) % 360;
     state.wind.updatedAt = Date.now();
+    state.wind.source = "manual";
     render();
   });
 
@@ -888,6 +938,7 @@
     b.addEventListener("click", function(){
       state.wind.dir = d.deg;
       state.wind.updatedAt = Date.now();
+      state.wind.source = "manual";
       render();
     });
     dirGrid.appendChild(b);
@@ -897,8 +948,12 @@
     var btn = e.target.closest("button");
     if(!btn) return;
     if(state.windUnit !== btn.dataset.unit){
+      var toMph = btn.dataset.unit === "mph";
       if(state.wind.speed !== null){
-        state.wind.speed = btn.dataset.unit === "mph" ? +(kmhToMph(state.wind.speed)).toFixed(1) : +(state.wind.speed * 1.60934).toFixed(1);
+        state.wind.speed = toMph ? +(kmhToMph(state.wind.speed)).toFixed(1) : +(state.wind.speed * 1.60934).toFixed(1);
+      }
+      if(state.wind.gust !== null && state.wind.gust !== undefined){
+        state.wind.gust = toMph ? Math.round(kmhToMph(state.wind.gust)) : Math.round(state.wind.gust * 1.60934);
       }
       state.windUnit = btn.dataset.unit;
       render();
